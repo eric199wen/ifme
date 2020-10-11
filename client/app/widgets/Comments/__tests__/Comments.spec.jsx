@@ -1,12 +1,11 @@
 // @flow
 import React from 'react';
 import axios from 'axios';
-import { mount } from 'enzyme';
-import { act } from 'react-dom/test-utils';
+import {
+  act, render, screen, waitFor,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Comments from 'widgets/Comments';
-
-let axiosPostSpy;
-let axiosDeleteSpy;
 
 const formProps = {
   inputs: [
@@ -83,41 +82,34 @@ const component = <Comments formProps={formProps} />;
 
 describe('Comments', () => {
   beforeEach(() => {
-    axiosPostSpy = jest.spyOn(axios, 'post').mockImplementation(() => Promise.resolve({
+    jest.spyOn(axios, 'post').mockImplementation(() => Promise.resolve({
       data: { comment },
     }));
-    axiosDeleteSpy = jest.spyOn(axios, 'delete').mockImplementation(() => Promise.resolve({
+    jest.spyOn(axios, 'delete').mockImplementation(() => Promise.resolve({
       data: { id },
     }));
   });
 
   it('renders correctly', () => {
-    let wrapper = null;
-    expect(() => {
-      wrapper = mount(component);
-    }).not.toThrow();
-    expect(wrapper).not.toBeNull();
+    render(component);
+    expect(() => component).not.toThrow();
+    expect(component).not.toBeNull();
   });
 
   it('add and delete a comment', async () => {
-    const wrapper = mount(component);
-    expect(wrapper.find('.comment').exists()).toEqual(false);
-    act(() => {
-      wrapper
-        .find('input[name="comment[comment]"]')
-        .simulate('change', { currentTarget: { value } });
+    render(component);
+    expect(screen.queryByRole('article')).toBeNull();
 
-      wrapper.find('select#comment_visibility').prop('onChange')({
-        currentTarget: { value: 'private' },
-      });
+    act(() => {
+      userEvent.type(screen.getByRole('textbox'));
+      userEvent.selectOptions(screen.getByRole('combobox'), 'private');
+      userEvent.click(screen.getByRole('button', { name: 'Submit' }));
     });
-    wrapper.find('input[type="submit"]').simulate('click');
-    await axiosPostSpy();
-    wrapper.update();
-    expect(wrapper.find('.comment').exists()).toEqual(true);
-    wrapper.find('.storyActionsDelete').find('a').simulate('click');
-    await axiosDeleteSpy();
-    wrapper.update();
-    expect(wrapper.find('.comment').exists()).toEqual(false);
+
+    await waitFor(() => expect(screen.queryByRole('article')).not.toBeNull());
+
+    userEvent.click(screen.getByRole('link', { name: 'Delete' }));
+
+    await waitFor(() => expect(screen.queryByRole('article')).toBeNull());
   });
 });
